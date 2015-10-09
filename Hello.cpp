@@ -9,19 +9,27 @@
   Last Updated : 0904, 2012, C.Wang
  ===============================================================*/
 #include "FlyWin32.h"
+#include "Player.h"
 
 using namespace std;
-
+// some globals
+int frame = 0;
 int oldX, oldY, oldXM, oldYM, oldXMM, oldYMM;
 
 VIEWPORTid vID;
 SCENEid sID;
-OBJECTid nID, cID, lID, tID, terrainRoomID, actorID;
+OBJECTid nID, cID, lID, tID;
+CHARACTERid actorID;            // the major character
 ACTIONid idleID, runID;
+TEXTid textID = FAILED_ID;
+ROOMid terrainRoomID = FAILED_ID;
+
+Player *player;
 
 void QuitGame(BYTE, BOOL4);
-void GameAI(int);
-void Movement(BYTE, BOOL4);
+void Update(int);
+void Render(int);
+void Input(BYTE, BOOL4);
 
 void InitPivot(int, int);
 void PivotCam(int, int);
@@ -75,32 +83,10 @@ void FyMain(int argc, char **argv)
    cID = scene.CreateObject(CAMERA);
    lID = scene.CreateObject(LIGHT);
 
-   // load the teapot model
-   FnObject model;
-   model.ID(nID);
-   model.Load("teapot");
-
-   // To load a character file
-   FySetModelPath("Data\\Characters");
-   FySetTexturePath("Data\\Characters");
-   FySetCharacterPath("Data\\Characters");
-
-   scene.ID(sID);
-   actorID = scene.LoadCharacter("Lyubu2");
-
-   FnCharacter actor;
-   actor.ID(actorID);
-   actor.SetTerrainRoom(terrainRoomID, 10.0f); //Put the character on terrain
-
-   float pos[3], fDir[3], uDir[3]; //Set the character position and facing direction & put it on terrain
-   pos[0] = 3569.0f; pos[1] = -3208.0f; pos[2] = 1000.0f;
-   fDir[0] = 1.0f; fDir[1] = 1.0f; fDir[2] = 0.0f;
-   uDir[0] = 0.0f; uDir[1] = 0.0f; uDir[2] = 1.0f;
-   actor.SetDirection(fDir, uDir);
-   BOOL4 beOK = actor.PutOnTerrain(pos);
-
-   idleID = actor.GetBodyAction(NULL, "Idle");
-   runID = actor.GetBodyAction(NULL, "Run");
+   //Player 
+   player = new Player();
+   player->LoadData(sID);
+   player->Init(terrainRoomID);
 
    // translate the camera
    FnCamera camera;
@@ -116,10 +102,10 @@ void FyMain(int argc, char **argv)
 
    // set Hotkeys
    FyDefineHotKey(FY_ESCAPE, QuitGame, FALSE);
-   FyDefineHotKey(FY_UP, Movement, TRUE);        // Up for moving forward
-   FyDefineHotKey(FY_RIGHT, Movement, TRUE);   // Right for turning right
-   FyDefineHotKey(FY_LEFT, Movement, TRUE);     // Left for turning left
-   FyDefineHotKey(FY_DOWN, Movement, TRUE);     // Left for turning left
+   FyDefineHotKey(FY_UP, Input, TRUE);        // Up for moving forward
+   FyDefineHotKey(FY_RIGHT, Input, TRUE);   // Right for turning right
+   FyDefineHotKey(FY_LEFT, Input, TRUE);     // Left for turning left
+   FyDefineHotKey(FY_DOWN, Input, TRUE);     // Left for turning left
 
    // define some mouse functions
    FyBindMouseFunction(LEFT_MOUSE, InitPivot, PivotCam, NULL, NULL);
@@ -127,7 +113,8 @@ void FyMain(int argc, char **argv)
    FyBindMouseFunction(RIGHT_MOUSE, InitMove, MoveCam, NULL, NULL);
 
    // bind a timer, frame rate = 30 fps
-   FyBindTimer(0, 30.0f, GameAI, TRUE);
+   FyBindTimer(0, 30.0f, Update, TRUE);
+   FyBindTimer(1, 30.0f, Render, TRUE);
 
    // invoke the system
    FyInvokeFly(TRUE);
@@ -138,22 +125,75 @@ void FyMain(int argc, char **argv)
   timer callback function which will be invoked by Fly2 System every 1/30 second
   C.Wang 0308, 2004
  --------------------------------------------------------------------------------*/
-void GameAI(int skip)
+/*-------------------------------------------------------------
+30fps timer callback in fixed frame rate for major game loop
+--------------------------------------------------------------*/
+void Update(int skip)
 {
-   // render the scene
-   FnViewport vp;
-   vp.Object(vID);
-   vp.Render3D(cID, TRUE, TRUE);
 
-   int nV, nT;
-   FyRenderBenchMark(&nT, &nV);
+	player->Update(skip);
+	
+	// Homework #01 part 1
+	// ....
+}
 
-   FySwapBuffers();
+/*----------------------
+perform the rendering
+C.Wang 0720, 2006
+-----------------------*/
+void Render(int skip)
+{
+	FnViewport vp;
 
-   FnCharacter actor;
-   actor.ID(actorID);
-   actor.SetCurrentAction(0, NULL, idleID, 5.0f);
-   actor.Play(START, 0.0f, FALSE, TRUE);
+	// render the whole scene
+	vp.ID(vID);
+	vp.Render3D(cID, TRUE, TRUE);
+
+	// get camera's data
+	FnCamera camera;
+	camera.ID(cID);
+
+	float pos[3], fDir[3], uDir[3];
+	camera.GetPosition(pos);
+	camera.GetDirection(fDir, uDir);
+
+	// show frame rate
+	static char string[128];
+	if (frame == 0) {
+		FyTimerReset(0);
+	}
+
+	if (frame / 10 * 10 == frame) {
+		float curTime;
+
+		curTime = FyTimerCheckTime(0);
+		sprintf(string, "Fps: %6.2f", frame / curTime);
+	}
+
+	frame += skip;
+	if (frame >= 1000) {
+		frame = 0;
+	}
+
+	FnText text;
+	text.ID(textID);
+
+	text.Begin(vID);
+	text.Write(string, 20, 20, 255, 0, 0);
+
+	char posS[256], fDirS[256], uDirS[256];
+	sprintf(posS, "pos: %8.3f %8.3f %8.3f", pos[0], pos[1], pos[2]);
+	sprintf(fDirS, "facing: %8.3f %8.3f %8.3f", fDir[0], fDir[1], fDir[2]);
+	sprintf(uDirS, "up: %8.3f %8.3f %8.3f", uDir[0], uDir[1], uDir[2]);
+
+	text.Write(posS, 20, 35, 255, 255, 0);
+	text.Write(fDirS, 20, 50, 255, 255, 0);
+	text.Write(uDirS, 20, 65, 255, 255, 0);
+
+	text.End();
+
+	// swap buffer
+	FySwapBuffers();
 }
 
 
@@ -171,26 +211,11 @@ void QuitGame(BYTE code, BOOL4 value)
 }
 
 /*------------------
-   Movement Control
+   Input
 -------------------*/
-void Movement(BYTE code, BOOL4 value){
-   FnCharacter actor;
-   actor.ID(actorID);
-   actor.SetCurrentAction(0, NULL, runID, 5.0f);
-   actor.Play(START, 0.0f, FALSE, TRUE);
-
-   if (code == FY_UP){
-      actor.MoveForward(2, FALSE, FALSE, 0, TRUE);
-   }
-   else if (code == FY_RIGHT){
-      actor.TurnRight(5);
-   }
-   else if (code == FY_LEFT){
-      actor.TurnRight(-5);
-   }
-   else if (code == FY_DOWN){
-      actor.MoveForward(-2, FALSE, FALSE, 0, TRUE);
-   }
+void Input(BYTE code, BOOL4 value)
+{
+	player->Input(code, value);
 }
 
 

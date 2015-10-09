@@ -2,9 +2,12 @@
 
 class Player
 {
-private:
+protected:
 	int actorID;
 	ACTIONid idleID, runID, curPoseID, nextPosID;
+	int speed = 0;
+	void AnimationUpdate(int skip);
+	void BehaviorUpdate(int skip);
 	
 public:
 	void LoadData(SCENEid sceneID);

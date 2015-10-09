@@ -30,36 +30,58 @@ void Player::Init(ROOMid terrainRoomID)
 	runID = actor.GetBodyAction(NULL, "Run");
 
 	// set the character to idle action
-	curPoseID = idleID;
-	actor.SetCurrentAction(NULL, 0, curPoseID);
-	actor.Play(START, 0.0f, FALSE, TRUE);
+	curPoseID = FAILED_ID;
+	nextPosID = idleID;
 	actor.TurnRight(90.0f);
 }
 void Player::Update(int skip)
 {
-	
 	FnCharacter actor;
-	
-	// play character pose
+
 	actor.ID(actorID);
-	
-	
-	if (nextPosID == runID)
+
+	if (speed != 0)
 	{
-		if (curPoseID != runID)
-			actor.SetCurrentAction(NULL, 0, nextPosID);
-		actor.Play(LOOP, (float)skip, FALSE, TRUE);
-		
+		actor.MoveForward(5, FALSE, FALSE, 0, TRUE);
 	}
-	else if (nextPosID == idleID)
-	{
-		if (nextPosID != idleID)
-			actor.SetCurrentAction(NULL, 0, nextPosID);
-		actor.Play(LOOP, (float)skip, FALSE, TRUE);
-	}
-	curPoseID = nextPosID;
+
+	BehaviorUpdate(skip);
+
+	AnimationUpdate(skip);
 
 }
+
+void Player::AnimationUpdate(int skip)
+{
+	FnCharacter actor;
+
+	actor.ID(actorID);
+
+	if (curPoseID != nextPosID)
+	{
+		actor.SetCurrentAction(NULL, 0, nextPosID);
+		
+	}
+	actor.Play(LOOP, (float)skip, FALSE, TRUE);
+	curPoseID = nextPosID;
+}
+
+void Player::BehaviorUpdate(int skip)
+{
+	FnCharacter actor;
+
+	actor.ID(actorID);
+
+	if (curPoseID == runID)
+	{
+		if (FyCheckHotKeyStatus(FY_UP) == FALSE)
+		{
+			nextPosID = idleID;
+			speed = 0;
+		}
+	}
+}
+
 void Player::Render(int skip)
 {
 	
@@ -70,20 +92,14 @@ void Player::Input(BYTE code, BOOL4 value)
 	actor.ID(actorID);
 
 	if (code == FY_UP){
-		actor.MoveForward(5, FALSE, FALSE, 0, TRUE);
+		speed = 5;
 		nextPosID = runID;
 	}
-	else if (code == FY_RIGHT){
+	if (code == FY_RIGHT){
 		actor.TurnRight(5);
-		nextPosID = runID;
 	}
-	else if (code == FY_LEFT){
+	if (code == FY_LEFT){
 		actor.TurnRight(-5);
-		nextPosID = runID;
 	}
-	else if (code == FY_DOWN){
-		actor.MoveForward(-4, FALSE, FALSE, 0, TRUE);
-		nextPosID = runID;
-	} 
 	
 }
