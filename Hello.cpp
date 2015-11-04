@@ -10,6 +10,7 @@
  ===============================================================*/
 #include "FlyWin32.h"
 #include "Player.h"
+#include "Camera.h"
 
 using namespace std;
 // some globals
@@ -18,25 +19,26 @@ int oldX, oldY, oldXM, oldYM, oldXMM, oldYMM;
 
 VIEWPORTid vID;
 SCENEid sID;
-OBJECTid nID, cID, lID, tID;
+OBJECTid nID, lID, tID;
 CHARACTERid actorID;            // the major character
 ACTIONid idleID, runID;
 TEXTid textID = FAILED_ID;
 ROOMid terrainRoomID = FAILED_ID;
 
 Player *player;
+Camera *camera;
 
 void QuitGame(BYTE, BOOL4);
 void Update(int);
 void Render(int);
 void Input(BYTE, BOOL4);
 
-void InitPivot(int, int);
-void PivotCam(int, int);
-void InitMove(int, int);
-void MoveCam(int, int);
-void InitZoom(int, int);
-void ZoomCam(int, int);
+//void InitPivot(int, int);
+//void PivotCam(int, int);
+//void InitMove(int, int);
+//void MoveCam(int, int);
+//void InitZoom(int, int);
+//void ZoomCam(int, int);
 
 /*------------------
   the main program
@@ -53,10 +55,7 @@ void FyMain(int argc, char **argv)
    FySetScenePath("Data\\Scenes");
 
    // create a viewport
-   vID = FyCreateViewport(0, 0, 800, 600);
-   FnViewport vp;
-   vp.ID(vID);
-   vp.SetBackgroundColor(0.3f, 0.4f, 0.5f);
+   
 
    // create a 3D scene & the 3D entities
    sID = FyCreateScene(1);
@@ -80,19 +79,17 @@ void FyMain(int argc, char **argv)
    room.AddObject(tID);
 
    nID = scene.CreateObject(OBJECT);
-   cID = scene.CreateObject(CAMERA);
    lID = scene.CreateObject(LIGHT);
+
+   // translate the camera
+   camera = new Camera();
+   camera->LoadData(sID);
+   camera->Init(terrainRoomID);
 
    //Player 
    player = new Player();
    player->LoadData(sID);
    player->Init(terrainRoomID);
-
-   // translate the camera
-   FnCamera camera;
-   camera.ID(cID);
-   camera.Rotate(X_AXIS, 90.0f, LOCAL);
-   camera.Translate(0.0f, 70.0f, 400.0f, LOCAL);
 
    // translate the light
    FnLight light;
@@ -102,15 +99,15 @@ void FyMain(int argc, char **argv)
 
    // set Hotkeys
    FyDefineHotKey(FY_ESCAPE, QuitGame, FALSE);
-   FyDefineHotKey(FY_UP, Input, TRUE);        // Up for moving forward
+   FyDefineHotKey(FY_UP, Input, FALSE);        // Up for moving forward
    FyDefineHotKey(FY_RIGHT, Input, TRUE);   // Right for turning right
    FyDefineHotKey(FY_LEFT, Input, TRUE);     // Left for turning left
-   FyDefineHotKey(FY_DOWN, Input, TRUE);     // Left for turning left
+   FyDefineHotKey(FY_DOWN, Input, FALSE);     // Left for turning left
 
    // define some mouse functions
-   FyBindMouseFunction(LEFT_MOUSE, InitPivot, PivotCam, NULL, NULL);
-   FyBindMouseFunction(MIDDLE_MOUSE, InitZoom, ZoomCam, NULL, NULL);
-   FyBindMouseFunction(RIGHT_MOUSE, InitMove, MoveCam, NULL, NULL);
+   //FyBindMouseFunction(LEFT_MOUSE, InitPivot, PivotCam, NULL, NULL);
+   //FyBindMouseFunction(MIDDLE_MOUSE, InitZoom, ZoomCam, NULL, NULL);
+   //FyBindMouseFunction(RIGHT_MOUSE, InitMove, MoveCam, NULL, NULL);
 
    // bind a timer, frame rate = 30 fps
    FyBindTimer(0, 30.0f, Update, TRUE);
@@ -132,9 +129,7 @@ void Update(int skip)
 {
 
 	player->Update(skip);
-	
-	// Homework #01 part 1
-	// ....
+	camera->Update(skip);
 }
 
 /*----------------------
@@ -143,54 +138,46 @@ C.Wang 0720, 2006
 -----------------------*/
 void Render(int skip)
 {
-	FnViewport vp;
+	camera->Render(skip);
 
-	// render the whole scene
-	vp.ID(vID);
-	vp.Render3D(cID, TRUE, TRUE);
+	//float pos[3], fDir[3], uDir[3];
+	//camera.GetPosition(pos);
+	//camera.GetDirection(fDir, uDir);
 
-	// get camera's data
-	FnCamera camera;
-	camera.ID(cID);
+	//// show frame rate
+	//static char string[128];
+	//if (frame == 0) {
+	//	FyTimerReset(0);
+	//}
 
-	float pos[3], fDir[3], uDir[3];
-	camera.GetPosition(pos);
-	camera.GetDirection(fDir, uDir);
+	//if (frame / 10 * 10 == frame) {
+	//	float curTime;
 
-	// show frame rate
-	static char string[128];
-	if (frame == 0) {
-		FyTimerReset(0);
-	}
+	//	curTime = FyTimerCheckTime(0);
+	//	sprintf(string, "Fps: %6.2f", frame / curTime);
+	//}
 
-	if (frame / 10 * 10 == frame) {
-		float curTime;
+	//frame += skip;
+	//if (frame >= 1000) {
+	//	frame = 0;
+	//}
 
-		curTime = FyTimerCheckTime(0);
-		sprintf(string, "Fps: %6.2f", frame / curTime);
-	}
+	//FnText text;
+	//text.ID(textID);
 
-	frame += skip;
-	if (frame >= 1000) {
-		frame = 0;
-	}
+	//text.Begin(vID);
+	//text.Write(string, 20, 20, 255, 0, 0);
 
-	FnText text;
-	text.ID(textID);
+	//char posS[256], fDirS[256], uDirS[256];
+	//sprintf(posS, "pos: %8.3f %8.3f %8.3f", pos[0], pos[1], pos[2]);
+	//sprintf(fDirS, "facing: %8.3f %8.3f %8.3f", fDir[0], fDir[1], fDir[2]);
+	//sprintf(uDirS, "up: %8.3f %8.3f %8.3f", uDir[0], uDir[1], uDir[2]);
 
-	text.Begin(vID);
-	text.Write(string, 20, 20, 255, 0, 0);
+	//text.Write(posS, 20, 35, 255, 255, 0);
+	//text.Write(fDirS, 20, 50, 255, 255, 0);
+	//text.Write(uDirS, 20, 65, 255, 255, 0);
 
-	char posS[256], fDirS[256], uDirS[256];
-	sprintf(posS, "pos: %8.3f %8.3f %8.3f", pos[0], pos[1], pos[2]);
-	sprintf(fDirS, "facing: %8.3f %8.3f %8.3f", fDir[0], fDir[1], fDir[2]);
-	sprintf(uDirS, "up: %8.3f %8.3f %8.3f", uDir[0], uDir[1], uDir[2]);
-
-	text.Write(posS, 20, 35, 255, 255, 0);
-	text.Write(fDirS, 20, 50, 255, 255, 0);
-	text.Write(uDirS, 20, 65, 255, 255, 0);
-
-	text.End();
+	//text.End();
 
 	// swap buffer
 	FySwapBuffers();
@@ -218,97 +205,97 @@ void Input(BYTE code, BOOL4 value)
 	player->Input(code, value);
 }
 
-
-/*-----------------------------------
-  initialize the pivot of the camera
-  C.Wang 0329, 2004
- ------------------------------------*/
-void InitPivot(int x, int y)
-{
-   oldX = x;
-   oldY = y;
-}
-
-
-/*------------------
-  pivot the camera
-  C.Wang 0329, 2004
- -------------------*/
-void PivotCam(int x, int y)
-{
-   FnObject model;
-
-   if (x != oldX) {
-      model.ID(cID);
-      model.Rotate(Z_AXIS, (float) (x - oldX), GLOBAL);
-      oldX = x;
-   }
-
-   if (y != oldY) {
-      model.ID(cID);
-      model.Rotate(X_AXIS, (float) (y - oldY), GLOBAL);
-      oldY = y;
-   }
-}
-
-
-/*----------------------------------
-  initialize the move of the camera
-  C.Wang 0329, 2004
- -----------------------------------*/
-void InitMove(int x, int y)
-{
-   oldXM = x;
-   oldYM = y;
-}
-
-
-/*------------------
-  move the camera
-  C.Wang 0329, 2004
- -------------------*/
-void MoveCam(int x, int y)
-{
-   if (x != oldXM) {
-      FnObject model;
-
-      model.ID(cID);
-      model.Translate((float)(x - oldXM)*0.1f, 0.0f, 0.0f, LOCAL);
-      oldXM = x;
-   }
-   if (y != oldYM) {
-      FnObject model;
-
-      model.ID(cID);
-      model.Translate(0.0f, (float)(oldYM - y)*0.1f, 0.0f, LOCAL);
-      oldYM = y;
-   }
-}
+//
+///*-----------------------------------
+//  initialize the pivot of the camera
+//  C.Wang 0329, 2004
+// ------------------------------------*/
+//void InitPivot(int x, int y)
+//{
+//   oldX = x;
+//   oldY = y;
+//}
+//
+//
+///*------------------
+//  pivot the camera
+//  C.Wang 0329, 2004
+// -------------------*/
+//void PivotCam(int x, int y)
+//{
+//   FnObject model;
+//
+//   if (x != oldX) {
+//      model.ID(cID);
+//      model.Rotate(Z_AXIS, (float) (x - oldX), GLOBAL);
+//      oldX = x;
+//   }
+//
+//   if (y != oldY) {
+//      model.ID(cID);
+//      model.Rotate(X_AXIS, (float) (y - oldY), GLOBAL);
+//      oldY = y;
+//   }
+//}
+//
+//
+///*----------------------------------
+//  initialize the move of the camera
+//  C.Wang 0329, 2004
+// -----------------------------------*/
+//void InitMove(int x, int y)
+//{
+//   oldXM = x;
+//   oldYM = y;
+//}
 
 
-/*----------------------------------
-  initialize the zoom of the camera
-  C.Wang 0329, 2004
- -----------------------------------*/
-void InitZoom(int x, int y)
-{
-   oldXMM = x;
-   oldYMM = y;
-}
-
-
-/*------------------
-  zoom the camera
-  C.Wang 0329, 2004
- -------------------*/
-void ZoomCam(int x, int y)
-{
-   if (x != oldXMM || y != oldYMM) {
-      FnObject model;
-
-      model.ID(cID);
-      model.Translate(0.0f, 0.0f, (float)(x - oldXMM), LOCAL);
-      oldXMM = x;
-      oldYMM = y;
-   }
-}
+///*------------------
+//  move the camera
+//  C.Wang 0329, 2004
+// -------------------*/
+//void MoveCam(int x, int y)
+//{
+//   if (x != oldXM) {
+//      FnObject model;
+//
+//      model.ID(cID);
+//      model.Translate((float)(x - oldXM)*0.1f, 0.0f, 0.0f, LOCAL);
+//      oldXM = x;
+//   }
+//   if (y != oldYM) {
+//      FnObject model;
+//
+//      model.ID(cID);
+//      model.Translate(0.0f, (float)(oldYM - y)*0.1f, 0.0f, LOCAL);
+//      oldYM = y;
+//   }
+//}
+//
+//
+///*----------------------------------
+//  initialize the zoom of the camera
+//  C.Wang 0329, 2004
+// -----------------------------------*/
+//void InitZoom(int x, int y)
+//{
+//   oldXMM = x;
+//   oldYMM = y;
+//}
+//
+//
+///*------------------
+//  zoom the camera
+//  C.Wang 0329, 2004
+// -------------------*/
+//void ZoomCam(int x, int y)
+//{
+//   if (x != oldXMM || y != oldYMM) {
+//      FnObject model;
+//
+//      model.ID(cID);
+//      model.Translate(0.0f, 0.0f, (float)(x - oldXMM), LOCAL);
+//      oldXMM = x;
+//      oldYMM = y;
+//   }
+//}
